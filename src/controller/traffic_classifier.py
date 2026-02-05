@@ -1,392 +1,246 @@
-#!/usr/bin/env python3
-"""
-AI-Powered Traffic Classifier for SDN
-Refactored production-ready implementation with fault tolerance
-"""
+#!/usr/bin/python
 
-import sys
+# Importing libraries
+
+# To display output from ML model
+from prettytable import PrettyTable 
+# To handle the Ryu output
+import subprocess, sys
+# For the timer
 import signal
-import subprocess
-import time
-import argparse
-from pathlib import Path
-from typing import Optional
-from prettytable import PrettyTable
+# For process handling
+import os
+# For training the model 
+import numpy as np
+#To use ML model in real-time
+import pickle 
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+## command to run ##
 
-from src.utils.config import get_config
-from src.utils.logger import get_logger, setup_logging
-from src.utils.health import get_health_monitor
-from src.ml.feature_extractor import FeatureExtractor
-from src.ml.model_manager import ModelManager
-from src.controller.flow_manager import FlowManager
-from src.controller.qos_manager import QoSManager
+# Path of simple_monitor
+#cmd = "sudo ryu run /usr/local/lib/python2.7/dist-packages/ryu/app/simple_monitor_AK.py"
+cmd = "/home/yokida/.local/bin/ryu-manager simple_monitor_13.py"
 
+flows = {} #empty flow dictionary
 
-class TrafficClassifier:
-    """
-    Main traffic classifier application.
-    
-    Integrates all components for real-time traffic classification with QoS.
-    """
-    
-    def __init__(self, algorithm: str = 'Randomforest', auto_install_rules: bool = False):
-        """
-        Initialize traffic classifier.
+#how long to collect training data
+TIMEOUT = 15*60 #15 min 
+
+class Flow:
+    def __init__(self, time_start, datapath, inport, ethsrc, ethdst, outport, packets, bytes):
+        self.time_start = time_start
+        self.datapath = datapath
+        self.inport = inport
+        self.ethsrc = ethsrc
+        self.ethdst = ethdst
+        self.outport = outport
         
-        Args:
-            algorithm: ML algorithm to use
-            auto_install_rules: Whether to automatically install flow rules
-        """
-        # Load configuration
-        self.config = get_config()
+        #attributes for forward flow direction (source -> destination)
+        self.forward_packets = packets
+        self.forward_bytes = bytes
+        self.forward_delta_packets = 0
+        self.forward_delta_bytes = 0
+        self.forward_inst_pps = 0.00
+        self.forward_avg_pps = 0.00
+        self.forward_inst_bps = 0.00
+        self.forward_avg_bps = 0.00
+        self.forward_status = 'ACTIVE'
+        self.forward_last_time = time_start
         
-        # Setup logging
-        logging_config = self.config.get('logging', {})
-        self.logger = setup_logging(logging_config)
+        #attributes for reverse flow direction (destination -> source)
+        self.reverse_packets = 0
+        self.reverse_bytes = 0
+        self.reverse_delta_packets = 0
+        self.reverse_delta_bytes = 0
+        self.reverse_inst_pps = 0.00
+        self.reverse_avg_pps = 0.00
+        self.reverse_inst_bps = 0.00
+        self.reverse_avg_bps = 0.00
+        self.reverse_status = 'INACTIVE'
+        self.reverse_last_time = time_start
         
-        self.logger.info("="*80)
-        self.logger.info("🚀 AI-POWERED TRAFFIC CLASSIFIER FOR SDN")
-        self.logger.info("="*80)
+    # Updates the attributes in the forward flow direction
+    def updateforward(self, packets, bytes, curr_time):
+        self.forward_delta_packets = packets - self.forward_packets
+        self.forward_packets = packets
+        if curr_time != self.time_start: self.forward_avg_pps = packets/float(curr_time-self.time_start)
+        if curr_time != self.forward_last_time: self.forward_inst_pps = self.forward_delta_packets/float(curr_time-self.forward_last_time)
         
-        # Initialize components
-        self.algorithm = algorithm
-        self.auto_install_rules = auto_install_rules
+        self.forward_delta_bytes = bytes - self.forward_bytes
+        self.forward_bytes = bytes
+        if curr_time != self.time_start: self.forward_avg_bps = bytes/float(curr_time-self.time_start)
+        if curr_time != self.forward_last_time: self.forward_inst_bps = self.forward_delta_bytes/float(curr_time-self.forward_last_time)
+        self.forward_last_time = curr_time
         
-        self.flow_manager = FlowManager(self.logger)
-        self.model_manager = ModelManager(self.config, self.logger)
-        self.qos_manager = QoSManager(self.config, self.logger)
-        self.health_monitor = get_health_monitor()
-        
-        # Ryu controller process
-        self.ryu_process: Optional[subprocess.Popen] = None
-        
-        # Statistics
-        self.classification_count = 0
-        self.classification_stats = {}
-        
-        # Load ML model
-        self._load_model()
-    
-    def _load_model(self):
-        """Load ML model"""
-        self.logger.info(f"Loading model: {self.algorithm}")
-        
-        success = self.model_manager.load_model(self.algorithm)
-        
-        if success:
-            self.health_monitor.set_component_status('model', True)
-            self.logger.info(f"✅ Model loaded successfully: {self.algorithm}")
+        if (self.forward_delta_bytes==0 or self.forward_delta_packets==0): #if the flow did not receive any packets of bytes
+            self.forward_status = 'INACTIVE'
         else:
-            self.health_monitor.set_component_status('model', False)
-            self.health_monitor.add_error(f"Failed to load model: {self.algorithm}")
-            self.logger.error(f"❌ Failed to load model: {self.algorithm}")
-            self.logger.warning("⚠️  System will use fallback classification")
-    
-    def start_ryu_controller(self):
-        """Start Ryu SDN controller"""
-        self.logger.info("Starting Ryu SDN controller...")
-        
-        controller_config = self.config.get_controller_config()
-        
-        # Build Ryu command
-        cmd = [
-            controller_config.ryu_executable,
-            '--ofp-tcp-listen-port', str(controller_config.listen_port),
-            '--log-file', str(self.config.resolve_path('logs/ryu.log')),
-            controller_config.monitor_script
-        ]
-        
-        try:
-            self.ryu_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=False
-            )
-            
-            self.health_monitor.set_component_status('controller', True)
-            self.logger.info(f"✅ Ryu controller started on port {controller_config.listen_port}")
-            
-            return True
-            
-        except Exception as e:
-            self.health_monitor.set_component_status('controller', False)
-            self.health_monitor.add_error(f"Failed to start Ryu: {e}")
-            self.logger.error(f"❌ Failed to start Ryu controller: {e}")
-            return False
-    
-    def process_flow_data(self, line: str) -> bool:
-        """
-        Process flow data line from Ryu controller.
-        
-        Args:
-            line: Flow data line
-            
-        Returns:
-            True if flow was processed
-        """
-        if 'data\t' not in line:
-            return False
-        
-        try:
-            # Parse flow data
-            fields = line.split('data\t')[1].strip().split('\t')
-            
-            if len(fields) < 8:
-                return False
-            
-            # Process flow statistics
-            flow = self.flow_manager.process_flow_stats(fields)
-            
-            if flow is None:
-                return False
-            
-            # Only classify active flows
-            if not flow.is_active():
-                return False
-            
-            # Extract features
-            features = FeatureExtractor.extract_safe(flow)
-            
-            if features is None:
-                self.logger.warning("Invalid features extracted", flow_id=flow.get_flow_id())
-                return False
-            
-            # Classify traffic
-            start_time = time.time()
-            prediction = self.model_manager.predict(features.to_array())
-            duration_ms = (time.time() - start_time) * 1000
-            
-            # Update flow with prediction
-            flow.predicted_type = prediction.traffic_type
-            flow.confidence = prediction.confidence
-            
-            # Assign QoS
-            qos_config = self.config.get('qos', {})
-            flow.assign_qos(prediction.traffic_type, qos_config)
-            
-            # Update statistics
-            self.classification_count += 1
-            self.classification_stats[prediction.traffic_type] = \
-                self.classification_stats.get(prediction.traffic_type, 0) + 1
-            
-            # Log classification
-            self.logger.log_flow_classification(
-                flow.get_flow_id(),
-                prediction.traffic_type,
-                prediction.confidence,
-                duration_ms
-            )
-            
-            # Install flow rule if enabled
-            if self.auto_install_rules and not prediction.fallback_used:
-                rule = self.qos_manager.create_flow_rule(flow, prediction.traffic_type, prediction.confidence)
-                
-                if rule:
-                    self.qos_manager.install_flow_rule(rule)
-                    flow.flow_rule_installed = True
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error processing flow data: {e}")
-            return False
-    
-    def display_classification_table(self):
-        """Display classification results in table format"""
-        table = PrettyTable()
-        table.field_names = [
-            "Flow ID", "Src MAC", "Dst MAC", "Traffic Type", 
-            "Confidence", "QoS Class", "Priority", "Rule Installed"
-        ]
-        
-        active_flows = self.flow_manager.get_active_flows()
-        
-        for flow_id, flow in active_flows.items():
-            if flow.predicted_type:
-                table.add_row([
-                    str(flow_id)[:8],
-                    flow.ethsrc[:17],
-                    flow.ethdst[:17],
-                    flow.predicted_type,
-                    f"{flow.confidence:.2%}",
-                    flow.qos_class,
-                    flow.priority,
-                    "✅" if flow.flow_rule_installed else "❌"
-                ])
-        
-        print("\n" + "="*100)
-        print(table)
-        print(f"\n📊 Classification Statistics: {self.classification_stats}")
-        print(f"📈 Total Classifications: {self.classification_count}")
-        print(f"🔄 Active Flows: {len(active_flows)}")
-        print(f"📋 Installed Rules: {self.qos_manager.get_rule_count()}")
-        print("="*100 + "\n")
-    
-    def run(self):
-        """Main run loop"""
-        # Start Ryu controller
-        if not self.start_ryu_controller():
-            self.logger.critical("Failed to start Ryu controller. Exiting.")
-            return 1
-        
-        self.logger.info("🎯 Traffic classifier running...")
-        self.logger.info(f"📊 Algorithm: {self.algorithm}")
-        self.logger.info(f"⚙️  Auto-install rules: {self.auto_install_rules}")
-        self.logger.info("⏳ Waiting for flow data...\n")
-        
-        # Classification interval
-        classification_interval = self.config.get('classification.classification_interval', 10)
-        last_display_time = time.time()
-        
-        try:
-            while True:
-                # Read from Ryu controller
-                line = self.ryu_process.stdout.readline()
-                
-                if not line and self.ryu_process.poll() is not None:
-                    self.logger.error("⚠️  Ryu controller process terminated")
-                    self.health_monitor.set_component_status('controller', False)
-                    break
-                
-                if line:
-                    decoded_line = line.decode('utf-8', errors='ignore').strip()
-                    
-                    # Process flow data
-                    self.process_flow_data(decoded_line)
-                
-                # Display classification table periodically
-                current_time = time.time()
-                if current_time - last_display_time >= classification_interval:
-                    self.display_classification_table()
-                    last_display_time = current_time
-                    
-                    # Clean up old flows
-                    self.flow_manager.clear_inactive_flows()
-                    
-                    # Clean up old rules
-                    self.qos_manager.clear_old_rules()
-        
-        except KeyboardInterrupt:
-            self.logger.info("\n⏹️  Received shutdown signal")
-        
-        except Exception as e:
-            self.logger.exception(f"Unexpected error: {e}")
-            return 1
-        
-        finally:
-            self.cleanup()
-        
-        return 0
-    
-    def cleanup(self):
-        """Cleanup resources"""
-        self.logger.info("🧹 Cleaning up...")
-        
-        # Stop Ryu controller
-        if self.ryu_process:
-            self.logger.info("Stopping Ryu controller...")
-            self.ryu_process.terminate()
-            try:
-                self.ryu_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.ryu_process.kill()
-        
-        # Display final statistics
-        self.logger.info("\n" + "="*80)
-        self.logger.info("📊 FINAL STATISTICS")
-        self.logger.info("="*80)
-        self.logger.info(f"Total Classifications: {self.classification_count}")
-        self.logger.info(f"Classification Breakdown: {self.classification_stats}")
-        self.logger.info(f"Total Flows: {self.flow_manager.get_flow_count()}")
-        self.logger.info(f"Installed Rules: {self.qos_manager.get_rule_count()}")
-        
-        qos_stats = self.qos_manager.get_statistics()
-        self.logger.info(f"QoS Statistics: {qos_stats}")
-        
-        self.logger.info("="*80)
-        self.logger.info("✅ Shutdown complete")
+            self.forward_status = 'ACTIVE'
 
+    # Updates the attributes in the reverse flow direction
+    def updatereverse(self, packets, bytes, curr_time):
+        self.reverse_delta_packets = packets - self.reverse_packets
+        self.reverse_packets = packets
+        if curr_time != self.time_start: self.reverse_avg_pps = packets/float(curr_time-self.time_start)
+        if curr_time != self.reverse_last_time: self.reverse_inst_pps = self.reverse_delta_packets/float(curr_time-self.reverse_last_time)
+        
+        self.reverse_delta_bytes = bytes - self.reverse_bytes
+        self.reverse_bytes = bytes
+        if curr_time != self.time_start: self.reverse_avg_bps = bytes/float(curr_time-self.time_start)
+        if curr_time != self.reverse_last_time: self.reverse_inst_bps = self.reverse_delta_bytes/float(curr_time-self.reverse_last_time)
+        self.reverse_last_time = curr_time
 
-def print_help():
-    """Print help message"""
-    print("\n" + "="*80)
-    print("🚀 AI-POWERED TRAFFIC CLASSIFIER FOR SDN")
-    print("="*80)
-    print("\n📖 Usage: python3 traffic_classifier.py [algorithm] [options]")
-    
-    print("\n🤖 Available Algorithms:")
-    print("   • Randomforest     - Random Forest (Best accuracy)")
-    print("   • logistic         - Logistic Regression (Fastest)")
-    print("   • kneighbors       - K-Nearest Neighbors")
-    print("   • svc              - Support Vector Machine")
-    print("   • gaussiannb       - Gaussian Naive Bayes")
-    print("   • kmeans           - K-Means Clustering (Unsupervised)")
-    
-    print("\n⚙️  Options:")
-    print("   --auto-rules       - Automatically install flow rules")
-    print("   --help, -h         - Show this help message")
-    
-    print("\n📝 Examples:")
-    print("   python3 traffic_classifier.py Randomforest")
-    print("   python3 traffic_classifier.py logistic --auto-rules")
-    
-    print("\n" + "="*80 + "\n")
+        if (self.reverse_delta_bytes==0 or self.reverse_delta_packets==0): #if the flow did not receive any packets of bytes
+            self.reverse_status = 'INACTIVE'
+        else:
+            self.reverse_status = 'ACTIVE'
 
+# Function to print flow attributes and output of ML model to classify the flow
+def printclassifier(model):
+    x = PrettyTable()
+    x.field_names = ["Flow ID", "Src MAC", "Dest MAC", "Traffic Type","Forward Status","Reverse Status"]
 
-def main():
-    """Main entry point"""
-    parser = argparse.ArgumentParser(
-        description='AI-Powered Traffic Classifier for SDN',
-        add_help=False
-    )
-    
-    parser.add_argument(
-        'algorithm',
-        nargs='?',
-        default='Randomforest',
-        help='ML algorithm to use'
-    )
-    
-    parser.add_argument(
-        '--auto-rules',
-        action='store_true',
-        help='Automatically install flow rules'
-    )
-    
-    parser.add_argument(
-        '--help', '-h',
-        action='store_true',
-        help='Show help message'
-    )
-    
-    args = parser.parse_args()
-    
-    if args.help:
-        print_help()
-        return 0
-    
-    # Create and run classifier
-    classifier = TrafficClassifier(
-        algorithm=args.algorithm,
-        auto_install_rules=args.auto_rules
-    )
-    
-    # Setup signal handlers
-    def signal_handler(sig, frame):
-        print("\n⏹️  Received interrupt signal")
-        classifier.cleanup()
-        sys.exit(0)
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
-    # Run classifier
-    return classifier.run()
+    for key,flow in flows.items():
+        features = np.asarray([flow.forward_delta_packets,flow.forward_delta_bytes,flow.forward_inst_pps,flow.forward_avg_pps,flow.forward_inst_bps, flow.forward_avg_bps, flow.reverse_delta_packets,flow.reverse_delta_bytes,flow.reverse_inst_pps,flow.reverse_avg_pps,flow.reverse_inst_bps,flow.reverse_avg_bps]).reshape(1,-1) # Convert to array so the model can understand the features properly
+        
+        label = model.predict(features.tolist()) # If model is supervised (logistic regression) then the label is the type of traffic
+        
+        # If the model is unsupervised, the label is a cluster number. Refer to Jupyter notebook to see how cluster numbers map to labels
+        if label == 0: label = ['dns']
+        elif label == 1: label = ['game']
+        elif label == 2: label = ['ping']
+        elif label == 3: label = ['quake']  
+        elif label == 4: label = ['telnet']
+        elif label == 5: label = ['voice']
+	
+        
+        x.add_row([key, flow.ethsrc, flow.ethdst, label[0],flow.forward_status,flow.reverse_status]) 
+    print(x) # Print output in pretty mode (i.e. formatted table)
 
+# Function to print flow attributes when collecting training data
+def printflows(traffic_type,f):
+    for key,flow in flows.items():
 
+        outstring = '\t'.join([
+        str(flow.forward_packets),
+        str(flow.forward_bytes),
+        str(flow.forward_delta_packets),
+        str(flow.forward_delta_bytes), 
+        str(flow.forward_inst_pps), 
+        str(flow.forward_avg_pps),
+        str(flow.forward_inst_bps), 
+        str(flow.forward_avg_bps), 
+        str(flow.reverse_packets),
+        str(flow.reverse_bytes),
+        str(flow.reverse_delta_packets),
+        str(flow.reverse_delta_bytes),
+        str(flow.reverse_inst_pps),
+        str(flow.reverse_avg_pps),
+        str(flow.reverse_inst_bps),
+        str(flow.reverse_avg_bps),
+        str(traffic_type)])
+        f.write(outstring+'\n')
+        
+def run_ryu(p,traffic_type=None,f=None,model=None):
+    ## run it ##
+    time = 0
+    while True:
+        #print 'going through loop'
+        out = p.stdout.readline()
+        if out == '' and p.poll() != None:
+            break
+        if out != '' and out.startswith(b'data'): #when Ryu 'simple_monitor_AK.py' script returns output
+            fields = out.split(b'\t')[1:] #split the flow details
+            
+            fields = [f.decode(encoding='utf-8', errors='strict') for f in fields] #decode flow details 
+            
+            unique_id = hash(''.join([fields[1],fields[3],fields[4]])) #create unique ID for flow based on switch ID, source host,and destination host
+            if unique_id in flows.keys():
+                flows[unique_id].updateforward(int(fields[6]),int(fields[7]),int(fields[0])) #update forward attributes with time, packet, and byte count
+            else:
+                rev_unique_id = hash(''.join([fields[1],fields[4],fields[3]])) #switch source and destination to generate same hash for src/dst and dst/src
+                if rev_unique_id in flows.keys():
+                    flows[rev_unique_id].updatereverse(int(fields[6]),int(fields[7]),int(fields[0])) #update reverse attributes with time, packet, and byte count
+                else:
+                    flows[unique_id] = Flow(int(fields[0]), fields[1], fields[2], fields[3], fields[4], fields[5], int(fields[6]), int(fields[7])) #create new flow object
+            if not model is None:
+                if time%10==0: #print output of model every 10 seconds
+                    printclassifier(model)
+            else:
+                printflows(traffic_type,f) #for training data
+        time += 1
+ 
+#print help output in case of incorrect options 
+def printHelp():
+    print("\nUsage: sudo python traffic_classifier.py [subcommand] [options]")
+    print("\n\tTo collect training data for a certain type of traffic, run: sudo python traffic_classifier.py train <TypeOfData>")
+    print("\n\tTo start a near real time traffic classification application using unsupervised ML, run: sudo python traffic_classifier.py <NameOfAlgo>")
+    print("\n\tTo start a near real time traffic classification application using supervised ML, run: sudo python traffic_classifier.py <NameOfAlgo>")
+    print("\n\t Available algorithms Logistic Regression, K Means clustering, K nearest neighbors, Random Forest Classifier, SVM, Gaussian Naive Bayes")
+    print("\n\t SUBCOMMANDS = ('train', 'logistic', 'kmeans', 'kneighbors', 'svm', 'Randomforest', 'gaussiannb')")
+    return
+
+#for timer to collect flow training data
+def alarm_handler(signum, frame):
+    print("Finished collecting data.")
+    raise Exception()
+    
 if __name__ == '__main__':
-    sys.exit(main())
+    SUBCOMMANDS = ('train', 'logistic', 'kmeans', 'kneighbors', 'svm', 'Randomforest', 'gaussiannb')
+
+    if len(sys.argv) < 2:
+        print("ERROR: Incorrect # of args")
+        print()
+        printHelp()
+        sys.exit();
+    else:
+        if len(sys.argv) == 2:
+            if sys.argv[1] not in SUBCOMMANDS:
+                print("ERROR: Unknown subcommand argument.")
+                print("       Currently subaccepted commands are: %s" % str(SUBCOMMANDS).strip('()'))
+                print()
+                printHelp()
+                sys.exit();
+
+    if len(sys.argv) == 1:
+        # Called with no arguments
+        printHelp()
+    elif len(sys.argv) >= 2:
+        if sys.argv[1] == "train":
+            if len(sys.argv) == 3:
+                p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) #start Ryu process
+                traffic_type = sys.argv[2]
+                f = open(traffic_type+'_training_data.csv', 'w') #open training data output file
+                signal.signal(signal.SIGALRM, alarm_handler) #start signal process
+                signal.alarm(TIMEOUT) #set for 15 minutes
+                try:
+                    headers = 'Forward Packets\tForward Bytes\tDelta Forward Packets\tDelta Forward Bytes\tForward Instantaneous Packets per Second\tForward Average Packets per second\tForward Instantaneous Bytes per Second\tForward Average Bytes per second\tReverse Packets\tReverse Bytes\tDelta Reverse Packets\tDelta Reverse Bytes\tDeltaReverse Instantaneous Packets per Second\tReverse Average Packets per second\tReverse Instantaneous Bytes per Second\tReverse Average Bytes per second\tTraffic Type\n'
+                    f.write(headers)
+                    run_ryu(p,traffic_type=traffic_type,f=f)
+                except Exception:
+                    print('Exiting')
+                    os.killpg(os.getpgid(p.pid), signal.SIGTERM) #kill ryu process on exit
+                    f.close()
+            else:
+                print("ERROR: specify traffic type.\n")
+
+        else:
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) #start ryu process
+            if sys.argv[1] == 'logistic':
+                infile = open('models/LogisticRegression','rb') 
+            elif sys.argv[1] == 'kmeans':
+                infile = open('models/KMeans_Clustering','rb')
+            elif sys.argv[1] == 'svm':
+                infile = open('models/SVC','rb')
+            elif sys.argv[1] == 'kneighbors':
+                infile = open('models/KNeighbors','rb')
+            elif sys.argv[1] == 'Randomforest':
+                infile = open('models/RandomForestClassifier','rb')
+            elif sys.argv[1] == 'gaussiannb':
+                infile = open('models/GaussianNB','rb')
+	    
+
+            model = pickle.load(infile) #unload previously trained ML model (refer to Jupyter notebook for details)
+            infile.close()
+            run_ryu(p,model=model)
+    sys.exit();
