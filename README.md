@@ -13,12 +13,11 @@ A production-ready, AI-powered traffic classification system for Software-Define
 - [Architecture](#architecture)
 - [Technology Stack](#technology-stack)
 - [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
+- [Setup & Installation](#setup--installation)
+- [Quick Start Guide](#quick-start-guide)
+- [Usage & Demo](#usage--demo)
 - [Configuration](#configuration)
-- [Usage](#usage)
 - [Testing](#testing)
-- [Deployment](#deployment)
 - [Performance](#performance)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -163,43 +162,35 @@ sudo apt-get install -y mininet openvswitch-switch
 pip3 install -r requirements.txt
 ```
 
-## 🚀 Installation
+## 📦 Setup & Installation
 
-### Option 1: Quick Install (Recommended)
+### Option 1: Automated setup (Recommended)
 
-```bash
-# Clone repository
-git clone https://github.com/yourusername/traffic-classifier-sdn.git
-cd traffic-classifier-sdn
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Kidus-kida/Traffic-classifier-SDN.git
+   cd Traffic-classifier-SDN
+   ```
 
-# Run automated setup
-chmod +x scripts/setup/install.sh
-./scripts/setup/install.sh
+2. **Run the installation script**:
+   ```bash
+   chmod +x scripts/setup/setup_wsl.sh
+   ./scripts/setup/setup_wsl.sh
+   ```
+   This will install:
+   - Mininet (network emulator)
+   - Open vSwitch (virtual switch)
+   - Ryu SDN Framework (controller)
+   - Python dependencies (scikit-learn, flask, etc.)
+   - D-ITG (traffic generator)
 
-# Verify installation
-./scripts/setup/verify.sh
-```
+3. **Verify installation**:
+   ```bash
+   chmod +x scripts/setup/verify_setup.sh
+   ./scripts/setup/verify_setup.sh
+   ```
 
-### Option 2: Manual Install
-
-```bash
-# 1. Install system dependencies
-sudo apt-get update
-sudo apt-get install -y mininet openvswitch-switch python3-pip
-
-# 2. Install Python dependencies
-pip3 install -r requirements.txt
-
-# 3. Install Ryu controller
-pip3 install ryu
-
-# 4. Verify installations
-python3 -c "import ryu; print('Ryu OK')"
-sudo mn --version
-sudo ovs-vsctl --version
-```
-
-### Option 3: Docker Install
+### Option 2: Docker Setup
 
 ```bash
 # Build containers
@@ -207,51 +198,66 @@ docker-compose build
 
 # Start system
 docker-compose up -d
-
-# Check status
-docker-compose ps
 ```
 
-## ⚡ Quick Start
+---
 
-### 1. Start the System (All-in-One)
+## ⚡ Quick Start Guide
 
+### 1. The Easy Way (Interactive Launcher)
+
+The easiest way to run the demo is to use our interactive Windows Launcher:
+
+1. Open **PowerShell** as Administrator.
+2. Run the launcher:
+   ```powershell
+   .\scripts\launcher.ps1
+   ```
+3. Choose **Option 2** for a Quick Test or **Option 6** for the Full Dashboard experience.
+
+### 2. Manual Execution (Terminal)
+
+You will need **two** open terminals in your WSL environment.
+
+#### Terminal 1: Start the AI Classifier
 ```bash
-# Start controller, dashboard, and network
-./scripts/start_all.sh
+sudo python3 src/controller/enhanced_traffic_classifier.py Randomforest
 ```
 
-This will:
-- Start Ryu controller on port 6633
-- Start web dashboard on port 9000
-- Create Mininet topology with 3 hosts
-- Begin real-time classification
-
-### 2. Access Dashboard
-
-Open browser to: **http://localhost:9000**
-
-### 3. Generate Traffic
-
+#### Terminal 2: Start the Network (Mininet)
 ```bash
-# In Mininet CLI (automatically started)
-mininet> h1 ping -c 10 h2
-mininet> h1 iperf -s &
-mininet> h2 iperf -c 10.0.0.1 -t 30
+sudo mn --topo single,3 --mac --switch ovsk --controller remote
 ```
 
-### 4. View Classifications
+---
 
-Check the dashboard or logs:
+## 📖 Usage & Demo
+
+### Generate Traffic & Identify
+Once Mininet is running, generate traffic at the `mininet>` prompt and watch the classifier terminal:
+
+1. **HTTP Traffic**:
+   ```bash
+   h1 curl -s 10.0.0.2
+   ```
+2. **DNS Traffic**:
+   ```bash
+   h1 dig @h2 example.com
+   ```
+3. **ICMP Traffic**:
+   ```bash
+   h1 ping -c 10 h2
+   ```
+
+### Accessing the Dashboard
+Open your browser to: **http://localhost:9000**
+*The dashboard provides real-time visualization of traffic distribution and automatic QoS rule mapping.*
+
+### Training Mode
+Collect your own training data for new traffic types:
 ```bash
-tail -f logs/classifier.log
-```
-
-### 5. Stop the System
-
-```bash
-# Stop all components
-./scripts/stop_all.sh
+sudo python3 src/controller/enhanced_traffic_classifier.py train video
+# Then generate video traffic in Mininet using ITGSend
 ```
 
 ## ⚙️ Configuration
