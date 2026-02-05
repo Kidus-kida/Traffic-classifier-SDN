@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDN Traffic Classifier - Real-Time Dashboard</title>
+    <meta name="description" content="Real-time traffic classification dashboard for Software-Defined Networks with AI-powered analytics">
+    
+    <!-- Chart.js for beautiful visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Socket.IO for real-time updates -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            
+            --bg-dark: #0f0f23;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --bg-card-hover: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0c0;
+            --border-color: rgba(255, 255, 255, 0.1);
+            
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
+            
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(118, 75, 162, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(75, 192, 254, 0.1) 0%, transparent 50%);
+            z-index: -1;
+            animation: backgroundPulse 15s ease-in-out infinite;
+        }
+
+        @keyframes backgroundPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        header {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--primary-gradient);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            animation: slideInDown 0.6s ease-out;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary-gradient);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            background: var(--bg-card-hover);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stat-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-change {
+            font-size: 0.85rem;
+            color: #00ff88;
+            margin-top: 0.5rem;
+        }
+
+        /* Charts Section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s ease;
+        }
+
+        .chart-container:hover {
+            box-shadow: var(--shadow-lg);
+        }
+
+        .chart-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        canvas {
+            max-height: 300px;
+        }
+
+        /* Flow Rules Table */
+        .table-container {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .badge-priority-high {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: #000;
+        }
+
+        .badge-priority-medium {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: #000;
+        }
+
+        .badge-priority-low {
+            background: rgba(160, 160, 192, 0.2);
+            color: var(--text-primary);
+        }
+
+        /* Animations */
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--border-color);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 SDN Traffic Classifier Dashboard</h1>
+            <p class="subtitle">Real-time AI-powered network traffic analysis and classification</p>
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                <span id="connection-status">Connected</span>
+            </div>
+        </header>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <div class="stat-card fade-in">
+                <div class="stat-label">Total Flows</div>
+                <div class="stat-value" id="total-flows">0</div>
+                <div class="stat-change">↑ Real-time</div>
+            </div>
+            <div class="stat-card fade-in">
+                <div class="stat-label">Active Flows</div>
+                <div class="stat-value" id="active-flows">0</div>
+                <div class="stat-change">↑ Live monitoring</div>
+            </div>
+            <div class="stat-card fade-in">
+                <div class="stat-label">Total Packets</div>
+                <div class="stat-value" id="total-packets">0</div>
+                <div class="stat-change">↑ Processed</div>
+            </div>
+            <div class="stat-card fade-in">
+                <div class="stat-label">Total Bytes</div>
+                <div class="stat-value" id="total-bytes">0</div>
+                <div class="stat-change">↑ Transferred</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2 class="chart-title">📊 Traffic Classification Distribution</h2>
+                <canvas id="classificationChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2 class="chart-title">🎯 QoS Class Distribution</h2>
+                <canvas id="qosChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container" style="margin-bottom: 2rem;">
+            <h2 class="chart-title">📈 Real-Time Traffic Flow</h2>
+            <canvas id="timeSeriesChart"></canvas>
+        </div>
+
+        <!-- Flow Rules Table -->
+        <div class="table-container">
+            <h2 class="chart-title">⚙️ Installed Flow Rules</h2>
+            <div id="flow-rules-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading flow rules...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        const socket = io('/live');
+        
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            document.getElementById('connection-status').textContent = 'Connected';
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            document.getElementById('connection-status').textContent = 'Disconnected';
+        });
+
+        // Chart configurations
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff',
+                        font: { family: 'Inter', size: 12 }
+                    }
+                }
+            }
+        };
+
+        // Classification Chart
+        const classificationCtx = document.getElementById('classificationChart').getContext('2d');
+        const classificationChart = new Chart(classificationCtx, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: [
+                        'rgba(102, 126, 234, 0.8)',
+                        'rgba(118, 75, 162, 0.8)',
+                        'rgba(75, 192, 254, 0.8)',
+                        'rgba(250, 112, 154, 0.8)',
+                        'rgba(254, 225, 64, 0.8)',
+                        'rgba(0, 255, 136, 0.8)',
+                        'rgba(255, 107, 107, 0.8)',
+                        'rgba(78, 205, 196, 0.8)'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                ...chartOptions,
+                cutout: '60%'
+            }
+        });
+
+        // QoS Chart
+        const qosCtx = document.getElementById('qosChart').getContext('2d');
+        const qosChart = new Chart(qosCtx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Flows',
+                    data: [],
+                    backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#a0a0c0' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#a0a0c0' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        // Time Series Chart
+        const timeSeriesCtx = document.getElementById('timeSeriesChart').getContext('2d');
+        const timeSeriesChart = new Chart(timeSeriesCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Active Flows',
+                    data: [],
+                    borderColor: 'rgba(102, 126, 234, 1)',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#a0a0c0' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#a0a0c0' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        // Update metrics
+        socket.on('metrics_update', (data) => {
+            if (!data || data.error) return;
+
+            // Update stats
+            document.getElementById('total-flows').textContent = data.total_flows || 0;
+            document.getElementById('active-flows').textContent = data.active_flows || 0;
+            document.getElementById('total-packets').textContent = formatNumber(data.total_packets || 0);
+            document.getElementById('total-bytes').textContent = formatBytes(data.total_bytes || 0);
+
+            // Update classification chart
+            if (data.classification_stats) {
+                const labels = Object.keys(data.classification_stats);
+                const values = Object.values(data.classification_stats);
+                classificationChart.data.labels = labels;
+                classificationChart.data.datasets[0].data = values;
+                classificationChart.update();
+            }
+
+            // Update QoS chart
+            if (data.qos_distribution) {
+                const labels = Object.keys(data.qos_distribution);
+                const values = Object.values(data.qos_distribution);
+                qosChart.data.labels = labels;
+                qosChart.data.datasets[0].data = values;
+                qosChart.update();
+            }
+
+            // Update time series
+            const now = new Date().toLocaleTimeString();
+            if (timeSeriesChart.data.labels.length > 20) {
+                timeSeriesChart.data.labels.shift();
+                timeSeriesChart.data.datasets[0].data.shift();
+            }
+            timeSeriesChart.data.labels.push(now);
+            timeSeriesChart.data.datasets[0].data.push(data.active_flows || 0);
+            timeSeriesChart.update();
+        });
+
+        // Load flow rules
+        async function loadFlowRules() {
+            try {
+                const response = await fetch('/api/flow-rules');
+                const data = await response.json();
+                
+                if (data.rules && data.rules.length > 0) {
+                    const tableHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Flow ID</th>
+                                    <th>Source MAC</th>
+                                    <th>Destination MAC</th>
+                                    <th>Traffic Type</th>
+                                    <th>QoS Class</th>
+                                    <th>Priority</th>
+                                    <th>Action</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.rules.map(rule => `
+                                    <tr>
+                                        <td>${rule.flow_id}</td>
+                                        <td>${rule.src_mac}</td>
+                                        <td>${rule.dst_mac}</td>
+                                        <td><strong>${rule.traffic_type}</strong></td>
+                                        <td>${rule.qos_class}</td>
+                                        <td><span class="badge badge-priority-${getPriorityClass(rule.priority)}">${rule.priority}</span></td>
+                                        <td>${rule.action}</td>
+                                        <td>${new Date(rule.timestamp).toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    document.getElementById('flow-rules-content').innerHTML = tableHTML;
+                } else {
+                    document.getElementById('flow-rules-content').innerHTML = '<p class="loading">No flow rules installed yet</p>';
+                }
+            } catch (error) {
+                console.error('Error loading flow rules:', error);
+                document.getElementById('flow-rules-content').innerHTML = '<p class="loading">Error loading flow rules</p>';
+            }
+        }
+
+        function getPriorityClass(priority) {
+            if (priority >= 4) return 'high';
+            if (priority >= 2) return 'medium';
+            return 'low';
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        function formatBytes(bytes) {
+            if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+            if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+            if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return bytes + ' B';
+        }
+
+        // Initial load
+        loadFlowRules();
+        setInterval(loadFlowRules, 5000); // Refresh every 5 seconds
+
+        // Request initial update
+        socket.emit('request_update');
+    </script>
+</body>
+</html>

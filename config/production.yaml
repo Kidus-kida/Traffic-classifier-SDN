@@ -1,0 +1,86 @@
+# Production Environment Configuration
+# Overrides default.yaml settings for production deployment
+
+system:
+  environment: production
+
+logging:
+  level: INFO
+  console:
+    enabled: true
+    level: WARNING
+  file:
+    enabled: true
+    level: INFO
+    rotation: time  # Rotate daily in production
+    backup_count: 30  # Keep 30 days of logs
+
+controller:
+  ryu:
+    log_level: INFO
+  connection:
+    timeout: 60
+    retry_attempts: 10
+    health_check_interval: 30
+
+classification:
+  classification_interval: 10
+  confidence_threshold: 0.75  # Higher threshold for production
+  flow_history_size: 1000
+
+flow_rules:
+  auto_install: true  # Enable automatic rule installation
+  max_rules: 10000
+  timeout: 300
+  cleanup_interval: 600
+
+metrics:
+  export:
+    enabled: true
+    interval: 60
+    format: json
+  prometheus:
+    enabled: true
+    port: 9091
+
+dashboard:
+  host: "0.0.0.0"  # Listen on all interfaces
+  port: 9000
+  debug: false
+  features:
+    websocket: true
+    real_time_updates: true
+    authentication: true  # Enable auth in production
+
+performance:
+  batch_processing:
+    enabled: true
+    batch_size: 100
+  rate_limiting:
+    enabled: true
+    max_requests_per_second: 1000
+  circuit_breaker:
+    failure_threshold: 10
+    timeout: 120
+    half_open_timeout: 60
+
+reliability:
+  health_checks:
+    enabled: true
+    interval: 30
+  graceful_shutdown:
+    enabled: true
+    timeout: 30
+
+security:
+  model_validation:
+    enabled: true
+    checksum_verification: true
+  api_security:
+    rate_limiting: true
+    authentication: true
+
+paths:
+  logs: "/var/log/traffic-classifier"
+  metrics: "/var/lib/traffic-classifier/metrics"
+  flow_rules: "/var/lib/traffic-classifier/flow_rules"

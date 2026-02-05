@@ -1,0 +1,165 @@
+{
+  "timestamp": "2026-02-05T03:23:40.416628",
+  "total_flows": 3,
+  "active_flows": 0,
+  "classification_stats": {
+    "dns": 34,
+    "game": 6,
+    "ping": 9,
+    "telnet": 0,
+    "voice": 2,
+    "http": 1,
+    "https": 0,
+    "ftp": 0,
+    "ssh": 1,
+    "video": 40
+  },
+  "recent_predictions": [
+    {
+      "timestamp": "2026-02-05T03:23:28.393170",
+      "flow_id": -7966812360910993365,
+      "traffic_type": "dns",
+      "confidence": 0.66,
+      "qos_class": "NETWORK_CONTROL"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:28.402734",
+      "flow_id": -9008047047797030341,
+      "traffic_type": "video",
+      "confidence": 0.9256751639061424,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:30.384652",
+      "flow_id": 919613886180568443,
+      "traffic_type": "video",
+      "confidence": 0.5258490376837126,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:30.394253",
+      "flow_id": -7966812360910993365,
+      "traffic_type": "dns",
+      "confidence": 0.66,
+      "qos_class": "NETWORK_CONTROL"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:30.404443",
+      "flow_id": -9008047047797030341,
+      "traffic_type": "video",
+      "confidence": 0.9285204365079365,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:32.388111",
+      "flow_id": 919613886180568443,
+      "traffic_type": "video",
+      "confidence": 0.5258490376837126,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:32.399439",
+      "flow_id": -7966812360910993365,
+      "traffic_type": "dns",
+      "confidence": 0.66,
+      "qos_class": "NETWORK_CONTROL"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:32.412685",
+      "flow_id": -9008047047797030341,
+      "traffic_type": "video",
+      "confidence": 0.9272505952380952,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:34.393570",
+      "flow_id": 919613886180568443,
+      "traffic_type": "video",
+      "confidence": 0.5258490376837126,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:34.403933",
+      "flow_id": -7966812360910993365,
+      "traffic_type": "dns",
+      "confidence": 0.66,
+      "qos_class": "NETWORK_CONTROL"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:34.417115",
+      "flow_id": -9008047047797030341,
+      "traffic_type": "video",
+      "confidence": 0.9271677795031056,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:36.388872",
+      "flow_id": 919613886180568443,
+      "traffic_type": "video",
+      "confidence": 0.5758490376837124,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:36.398100",
+      "flow_id": -7966812360910993365,
+      "traffic_type": "dns",
+      "confidence": 0.66,
+      "qos_class": "NETWORK_CONTROL"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:36.407539",
+      "flow_id": -9008047047797030341,
+      "traffic_type": "video",
+      "confidence": 0.9275379791958858,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:38.390479",
+      "flow_id": 919613886180568443,
+      "traffic_type": "video",
+      "confidence": 0.5758490376837124,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:38.400431",
+      "flow_id": -7966812360910993365,
+      "traffic_type": "dns",
+      "confidence": 0.66,
+      "qos_class": "NETWORK_CONTROL"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:38.410018",
+      "flow_id": -9008047047797030341,
+      "traffic_type": "video",
+      "confidence": 0.9296239237465044,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:40.393344",
+      "flow_id": 919613886180568443,
+      "traffic_type": "video",
+      "confidence": 0.5975254764838648,
+      "qos_class": "REAL_TIME"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:40.403749",
+      "flow_id": -7966812360910993365,
+      "traffic_type": "dns",
+      "confidence": 0.66,
+      "qos_class": "NETWORK_CONTROL"
+    },
+    {
+      "timestamp": "2026-02-05T03:23:40.413703",
+      "flow_id": -9008047047797030341,
+      "traffic_type": "video",
+      "confidence": 0.9264416370179529,
+      "qos_class": "REAL_TIME"
+    }
+  ],
+  "qos_distribution": {
+    "REAL_TIME": 2,
+    "NETWORK_CONTROL": 1
+  },
+  "total_bytes": 5979,
+  "total_packets": 72
+}

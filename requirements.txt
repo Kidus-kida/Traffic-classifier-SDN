@@ -1,0 +1,32 @@
+# Python dependencies for Traffic Classifier SDN
+
+# Core dependencies
+numpy>=1.21.0
+scikit-learn>=1.0.0
+PyYAML>=5.4.0
+prettytable>=2.5.0
+psutil>=5.8.0
+
+# SDN Framework
+ryu>=4.34
+
+# Web Framework
+Flask>=2.0.0
+Flask-SocketIO>=5.1.0
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=3.0.0
+pytest-mock>=3.6.0
+
+# Code Quality
+black>=22.0.0
+flake8>=4.0.0
+mypy>=0.950
+
+# Optional: Monitoring
+prometheus-client>=0.12.0
+
+# Optional: Documentation
+Sphinx>=4.0.0
+sphinx-rtd-theme>=1.0.0
