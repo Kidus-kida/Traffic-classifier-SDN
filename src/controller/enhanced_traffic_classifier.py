@@ -18,14 +18,19 @@ import time
 from datetime import datetime
 from collections import deque
 
+# Determine project root
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+
 # Configuration
 SUPPORTED_TRAFFIC_TYPES = ['dns', 'game', 'ping', 'telnet', 'voice', 'http', 'https', 'ftp', 'ssh', 'video']
 FLOW_HISTORY_SIZE = 100  # Keep last 100 predictions for time-series analysis
-METRICS_FILE = 'metrics/real_time_metrics.json'
-FLOW_RULES_FILE = 'flow_rules/auto_generated_rules.json'
+METRICS_FILE = os.path.join(PROJECT_ROOT, 'data', 'metrics', 'real_time_metrics.json')
+FLOW_RULES_FILE = os.path.join(SCRIPT_DIR, 'flow_rules', 'auto_generated_rules.json')
 
 # Ryu controller path
-cmd = "ryu-manager --ofp-tcp-listen-port 6633 simple_monitor_13.py"
+# Run ryu-manager from the script directory to ensure simple_monitor_13.py is found
+cmd = f"cd {SCRIPT_DIR} && ryu-manager --ofp-tcp-listen-port 6633 simple_monitor_13.py"
 
 flows = {}
 flow_history = deque(maxlen=FLOW_HISTORY_SIZE)
@@ -190,7 +195,7 @@ def install_flow_rule(flow, traffic_type):
     }
     
     # Save rule to file
-    os.makedirs('flow_rules', exist_ok=True)
+    os.makedirs(os.path.dirname(FLOW_RULES_FILE), exist_ok=True)
     rules = []
     if os.path.exists(FLOW_RULES_FILE):
         with open(FLOW_RULES_FILE, 'r') as f:
@@ -221,7 +226,7 @@ def get_flow_action(traffic_type):
 
 def export_metrics():
     """Export real-time metrics for dashboard"""
-    os.makedirs('metrics', exist_ok=True)
+    os.makedirs(os.path.dirname(METRICS_FILE), exist_ok=True)
     
     metrics = {
         'timestamp': datetime.now().isoformat(),
@@ -439,8 +444,9 @@ if __name__ == '__main__':
             print(f"🎓 Training mode: Collecting {traffic_type} traffic data for {TIMEOUT//60} minutes...")
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             
-            os.makedirs('datasets', exist_ok=True)
-            f = open(f'datasets/{traffic_type}_training_data.csv', 'w')
+            datasets_dir = os.path.join(PROJECT_ROOT, 'data')
+            os.makedirs(datasets_dir, exist_ok=True)
+            f = open(os.path.join(datasets_dir, f'{traffic_type}_training_data.csv'), 'w')
             
             signal.signal(signal.SIGALRM, alarm_handler)
             signal.alarm(TIMEOUT)
@@ -469,12 +475,12 @@ if __name__ == '__main__':
         
         # Load model
         model_files = {
-            'logistic': 'models/LogisticRegression',
-            'kmeans': 'models/KMeans_Clustering',
-            'svm': 'models/SVC',
-            'kneighbors': 'models/KNeighbors',
-            'Randomforest': 'models/RandomForestClassifier',
-            'gaussiannb': 'models/GaussianNB'
+            'logistic': os.path.join(PROJECT_ROOT, 'models', 'LogisticRegression'),
+            'kmeans': os.path.join(PROJECT_ROOT, 'models', 'KMeans_Clustering'),
+            'svm': os.path.join(PROJECT_ROOT, 'models', 'SVC'),
+            'kneighbors': os.path.join(PROJECT_ROOT, 'models', 'KNeighbors'),
+            'Randomforest': os.path.join(PROJECT_ROOT, 'models', 'RandomForestClassifier'),
+            'gaussiannb': os.path.join(PROJECT_ROOT, 'models', 'GaussianNB')
         }
         
         if args[1] == 'lstm':

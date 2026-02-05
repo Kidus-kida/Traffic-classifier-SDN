@@ -66,9 +66,11 @@ class ConfigurationManager:
         self.base_dir = Path(__file__).parent.parent.parent
         self.environment = environment or os.getenv('ENVIRONMENT', 'development')
         
+        self.config_dir = self.base_dir / 'src' / 'utils' / 'config'
+        
         # Load configuration
         if config_file is None:
-            config_file = self.base_dir / 'config' / 'default.yaml'
+            config_file = self.config_dir / 'default.yaml'
         else:
             config_file = Path(config_file)
             
@@ -92,7 +94,7 @@ class ConfigurationManager:
     
     def _apply_environment_overrides(self):
         """Apply environment-specific configuration overrides"""
-        env_config_file = self.base_dir / 'config' / f'{self.environment}.yaml'
+        env_config_file = self.config_dir / f'{self.environment}.yaml'
         
         if env_config_file.exists():
             with open(env_config_file, 'r') as f:

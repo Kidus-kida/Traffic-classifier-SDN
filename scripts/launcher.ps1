@@ -62,18 +62,16 @@ switch ($choice) {
         Write-Host "INSTRUCTIONS:" -ForegroundColor Yellow
         Write-Host "1. Terminal 1 (this window) will start Mininet" -ForegroundColor White
         Write-Host "2. Open a NEW PowerShell window and run:" -ForegroundColor White
-        Write-Host "   wsl -e bash -c 'cd $wslPath && sudo python3 traffic_classifier.py logistic'" -ForegroundColor Green
+        Write-Host "   wsl -e bash -c 'cd $wslPath && sudo python3 src/controller/enhanced_traffic_classifier.py logistic'" -ForegroundColor Green
         Write-Host "3. Then in Mininet prompt, type: h1 ping h2" -ForegroundColor White
         Write-Host ""
         Read-Host "Press Enter to start Mininet"
         wsl -e bash -c "cd $wslPath && sudo mn -c && sudo mn --topo single,3 --mac --switch ovsk --controller remote"
     }
     
-    "3" {
+        Write-Host "Validating system..." -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "Validating datasets..." -ForegroundColor Cyan
-        Write-Host ""
-        wsl -e bash -c "cd $wslPath && python3 validate_datasets.py"
+        wsl -e bash -c "cd $wslPath && ./scripts/setup/verify_setup.sh"
         Write-Host ""
         Read-Host "Press Enter to continue"
     }
@@ -91,7 +89,7 @@ switch ($choice) {
         Write-Host "INSTRUCTIONS:" -ForegroundColor Yellow
         Write-Host "1. Terminal 1 (this window) will start Mininet with D-ITG receiver" -ForegroundColor White
         Write-Host "2. Open a NEW PowerShell window and run:" -ForegroundColor White
-        Write-Host "   wsl -e bash -c 'cd $wslPath && python3 enhanced_traffic_classifier.py train $trafficType'" -ForegroundColor Green
+        Write-Host "   wsl -e bash -c 'cd $wslPath && python3 src/controller/enhanced_traffic_classifier.py train $trafficType'" -ForegroundColor Green
         Write-Host "3. Wait for collector to start, then in Mininet prompt, type:" -ForegroundColor White
         Write-Host "   h1 ITGSend D-IGT_scripts/${trafficType}_script_file -a h2" -ForegroundColor Green
         Write-Host "4. Wait 15 minutes for collection to complete" -ForegroundColor White
@@ -100,11 +98,9 @@ switch ($choice) {
         wsl -e bash -c "cd $wslPath && sudo mn -c && sudo mn --topo single,3 --mac --switch ovsk --controller remote"
     }
     
-    "5" {
-        Write-Host ""
         Write-Host "Retraining all models..." -ForegroundColor Cyan
         Write-Host ""
-        wsl -e bash -c "cd $wslPath && python3 retrain_all_models.py"
+        wsl -e bash -c "cd $wslPath && python3 scripts/utils/retrain_all_models.py"
         Write-Host ""
         Read-Host "Press Enter to continue"
     }
@@ -117,10 +113,10 @@ switch ($choice) {
         Write-Host "You need to open 3 PowerShell windows:" -ForegroundColor White
         Write-Host ""
         Write-Host "Terminal 1 - Dashboard:" -ForegroundColor Cyan
-        Write-Host "  wsl -e bash -c 'cd $wslPath/dashboard && python3 app.py'" -ForegroundColor Green
+        Write-Host "  wsl -e bash -c 'cd $wslPath && python3 src/dashboard/app.py'" -ForegroundColor Green
         Write-Host ""
         Write-Host "Terminal 2 - AI Classifier:" -ForegroundColor Cyan
-        Write-Host "  wsl -e bash -c 'cd $wslPath && sudo python3 enhanced_traffic_classifier.py Randomforest'" -ForegroundColor Green
+        Write-Host "  wsl -e bash -c 'cd $wslPath && sudo python3 src/controller/enhanced_traffic_classifier.py Randomforest'" -ForegroundColor Green
         Write-Host ""
         Write-Host "Terminal 3 - Network:" -ForegroundColor Cyan
         Write-Host "  wsl -e bash -c 'cd $wslPath && sudo mn -c && sudo mn --topo single,3 --mac --switch ovsk --controller remote,ip=127.0.0.1,port=6633'" -ForegroundColor Green
@@ -143,7 +139,7 @@ switch ($choice) {
         Write-Host ""
         Write-Host "Cleaning up stuck processes..." -ForegroundColor Cyan
         Write-Host ""
-        wsl -e bash -c "cd $wslPath && sudo mn -c && sudo pkill -f ryu-manager && sudo fuser -k 6633/tcp && sudo fuser -k 5000/tcp"
+        wsl -e bash -c "cd $wslPath && sudo mn -c && sudo pkill -f ryu-manager && sudo fuser -k 6633/tcp && sudo fuser -k 9000/tcp"
         Write-Host ""
         Write-Host "Cleanup complete!" -ForegroundColor Green
         Write-Host ""
@@ -155,16 +151,13 @@ switch ($choice) {
         Write-Host "Opening documentation..." -ForegroundColor Cyan
         Write-Host ""
         Write-Host "Available documentation files:" -ForegroundColor Yellow
-        Write-Host "  - PROJECT_ANALYSIS.md (Complete project overview)" -ForegroundColor White
-        Write-Host "  - ACTION_PLAN.md (Step-by-step execution plan)" -ForegroundColor White
-        Write-Host "  - QUICK_START.md (Quick start guide)" -ForegroundColor White
-        Write-Host "  - PROJECT_DOCUMENTATION.md (Technical details)" -ForegroundColor White
-        Write-Host "  - DATA_COLLECTION_WORKFLOW.md (Data collection guide)" -ForegroundColor White
+        Write-Host "  - README.md (Comprehensive project guide)" -ForegroundColor White
+        Write-Host "  - docs/academic/COMPLETE_ACADEMIC_REPORT.md (Academic report)" -ForegroundColor White
         Write-Host ""
         
         # Open in default editor
-        Start-Process "$projectPath\PROJECT_ANALYSIS.md"
-        Start-Process "$projectPath\ACTION_PLAN.md"
+        Start-Process "$projectPath\README.md"
+        Start-Process "$projectPath\docs\academic\COMPLETE_ACADEMIC_REPORT.md"
         
         Write-Host "Documentation opened in default editor!" -ForegroundColor Green
         Write-Host ""

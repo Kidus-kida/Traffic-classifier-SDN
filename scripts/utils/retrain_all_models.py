@@ -14,15 +14,23 @@ import glob
 def retrain_models():
     print("🔄 Re-training all models using all available datasets...")
     
+    # Determine project root
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+    
+    # Paths
+    MODELS_DIR = os.path.join(PROJECT_ROOT, 'models')
+    DATASETS_DIR = os.path.join(PROJECT_ROOT, 'data')
+    
     # Create models directory if it doesn't exist
-    if not os.path.exists('models'):
-        os.makedirs('models')
+    if not os.path.exists(MODELS_DIR):
+        os.makedirs(MODELS_DIR)
 
     # dynamically find all dataset files
-    dataset_files = glob.glob('datasets/*_training_data.csv')
+    dataset_files = glob.glob(os.path.join(DATASETS_DIR, '*_training_data.csv'))
     
     if not dataset_files:
-        print("❌ Error: No training data found in datasets folder!")
+        print(f"❌ Error: No training data found in {DATASETS_DIR} folder!")
         return
 
     print(f"Found {len(dataset_files)} datasets: {[os.path.basename(f) for f in dataset_files]}")
@@ -72,12 +80,12 @@ def retrain_models():
 
     # Model Dictionary
     models_to_train = {
-        'models/LogisticRegression': LogisticRegression(max_iter=5000),
-        'models/RandomForestClassifier': RandomForestClassifier(n_estimators=100),
-        'models/KNeighbors': KNeighborsClassifier(n_neighbors=5),
-        'models/SVC': SVC(probability=True), # Enable probability for confidence scores
-        'models/GaussianNB': GaussianNB(),
-        'models/KMeans_Clustering': KMeans(n_clusters=len(np.unique(y)), n_init='auto')
+        os.path.join(MODELS_DIR, 'LogisticRegression'): LogisticRegression(max_iter=5000),
+        os.path.join(MODELS_DIR, 'RandomForestClassifier'): RandomForestClassifier(n_estimators=100),
+        os.path.join(MODELS_DIR, 'KNeighbors'): KNeighborsClassifier(n_neighbors=5),
+        os.path.join(MODELS_DIR, 'SVC'): SVC(probability=True), # Enable probability for confidence scores
+        os.path.join(MODELS_DIR, 'GaussianNB'): GaussianNB(),
+        os.path.join(MODELS_DIR, 'KMeans_Clustering'): KMeans(n_clusters=len(np.unique(y)), n_init='auto')
     }
 
     for path, model in models_to_train.items():

@@ -9,7 +9,7 @@ sudo pkill -9 -f enhanced
 sudo pkill -9 -f ryu-manager
 
 echo "🚀 Starting Traffic Classifier (Ryu) in background..."
-python3 -u enhanced_traffic_classifier.py Randomforest --auto-rules > classifier.log 2>&1 &
+python3 -u src/controller/enhanced_traffic_classifier.py Randomforest --auto-rules > logs/classifier.log 2>&1 &
 
 echo "⏳ Waiting for Ryu to listen on port 6633..."
 MAX_RETRIES=30
@@ -25,9 +25,7 @@ done
 echo "✅ Ryu is ready on 6633."
 
 echo "🌐 Starting Dashboard on port 9000..."
-cd dashboard
-python3 -u enhanced_app.py > dashboard.log 2>&1 &
-cd ..
+python3 -u src/dashboard/app.py > logs/dashboard.log 2>&1 &
 sleep 5
 
 echo "🎮 Starting Mininet topology..."

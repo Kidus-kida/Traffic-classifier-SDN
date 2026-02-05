@@ -127,7 +127,9 @@ def update_system_health(health_data: Dict):
 
 def load_metrics_periodically():
     """Load metrics from file periodically"""
-    metrics_file = Path('metrics/real_time_metrics.json')
+    # Robust path detection
+    base_dir = Path(__file__).parent.parent.parent
+    metrics_file = base_dir / 'data' / 'metrics' / 'real_time_metrics.json'
     
     while True:
         try:

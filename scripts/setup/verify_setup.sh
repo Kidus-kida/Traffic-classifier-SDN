@@ -83,15 +83,17 @@ check_python_module "subprocess"
 
 echo ""
 echo "Checking project files..."
-check_file "traffic_classifier.py" "Main classifier script"
-check_file "simple_monitor_13.py" "Ryu monitor script"
-check_file "PROJECT_DOCUMENTATION.md" "Documentation"
+check_file "src/controller/enhanced_traffic_classifier.py" "Enhanced classifier script"
+check_file "src/controller/simple_monitor_13.py" "Ryu monitor script"
+check_file "README.md" "Main documentation"
+check_file "docs/academic/COMPLETE_ACADEMIC_REPORT.md" "Academic report"
 
 echo ""
 echo "Checking project directories..."
 check_dir "models" "Models directory"
-check_dir "datasets" "Datasets directory"
+check_dir "data" "Data directory"
 check_dir "D-IGT_scripts" "D-ITG scripts directory"
+check_dir "src/dashboard" "Dashboard directory"
 
 echo ""
 echo "Checking ML model files..."
@@ -124,9 +126,12 @@ if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
     echo ""
     echo "You're ready to run the project!"
     echo ""
-    echo "To start:"
+    echo "To start easily, use the launcher:"
+    echo "  .\scripts\launcher.ps1  (in PowerShell)"
+    echo ""
+    echo "Or start manually:"
     echo "1. Terminal 1: sudo mn --topo single,3 --mac --switch ovsk --controller remote"
-    echo "2. Terminal 2: sudo python3 traffic_classifier.py logistic"
+    echo "2. Terminal 2: sudo python3 src/controller/enhanced_traffic_classifier.py Randomforest"
 elif [ $ERRORS -eq 0 ]; then
     echo -e "${YELLOW}⚠ $WARNINGS warning(s) found${NC}"
     echo "The project should still work, but some features may be limited."
@@ -137,7 +142,7 @@ else
     fi
     echo ""
     echo "Please run the setup script to install missing dependencies:"
-    echo "  ./setup_wsl.sh"
+    echo "  ./scripts/setup/setup_wsl.sh"
 fi
 
 echo ""
