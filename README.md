@@ -548,9 +548,6 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ### Development Setup
 
 ```bash
-# Fork and clone repository
-git clone https://github.com/yourusername/traffic-classifier-sdn.git
-cd traffic-classifier-sdn
 
 # Create virtual environment
 python3 -m venv venv
